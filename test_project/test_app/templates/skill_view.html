@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skill Mapping</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsPlumb/2.15.6/js/jsplumb.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 50px;
+            margin-top: 20px;
+            position: relative;
+        }
+
+        .table-container {
+            position: relative;
+            display: inline-block;
+            min-width: 250px;
+            border: 2px solid #ccc;
+            padding: 20px;
+            border-radius: 10px;
+            background-color: #f9f9f9;
+            box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 250px;
+            border-collapse: collapse;
+            margin: 10px auto;
+            position: relative;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .clickable {
+            cursor: pointer;
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        .clickable:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h2>Skill Mapping System</h2>
+
+    <div class="container">
+        <!-- Person Table -->
+        <div class="table-container">
+            <h3>Persons</h3>
+            <table>
+                <tr><th>ID</th><th>Name</th></tr>
+                {% for person in persons %}
+                <tr id="person-{{ person.id }}" class="clickable person" data-id="{{ person.id }}">
+                    <td>{{ person.id }}</td>
+                    <td>{{ person.name }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+
+        <!-- Skill Table -->
+        <div class="table-container">
+            <h3>Skills</h3>
+            <table>
+                <tr><th>ID</th><th>Name</th></tr>
+                {% for skill in skills %}
+                <tr id="skill-{{ skill.id }}" class="clickable skill" data-id="{{ skill.id }}">
+                    <td>{{ skill.id }}</td>
+                    <td>{{ skill.name }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+
+        <!-- Category Table -->
+        <div class="table-container">
+            <h3>Categories</h3>            
+            <table>
+                <tr><th>ID</th><th>Name</th></tr>
+                {% for category in categories %}
+                <tr id="category-{{ category.id }}" class="clickable category" data-id="{{ category.id }}">
+                    <td>{{ category.id }}</td>
+                    <td>{{ category.name }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Pre-loaded data passed from the Django view
+        const personSkills = {{ person_skills|safe }};
+        const categorySkills = {{ category_skills|safe }};
+        const skillPersons = {{ skill_persons|safe }};
+        const skillCategories = {{ skill_categories|safe }};
+
+        document.addEventListener("DOMContentLoaded", function () {
+            // Initialize jsPlumb
+            var instance = jsPlumb.getInstance({
+                Connector: ["Bezier", { curviness: 50 }],
+                Endpoint: ["Dot", { radius: 4 }],
+                PaintStyle: { stroke: "#ff4500", strokeWidth: 3 },  // Changed arrow color to orange
+                Anchors: ["Right", "Left"]
+            });
+
+            // Function to clear previous connections
+            function clearConnections() {
+                instance.deleteEveryConnection();
+            }
+
+            // Function to draw arrows between related elements
+            function drawArrows(sourceId, targetId) {
+                instance.connect({
+                    source: sourceId,
+                    target: targetId,
+                    overlays: [["Arrow", { location: 1, width: 5, length: 5 }]] // Fine-tuned arrow size
+                });
+            }
+
+            // Function to highlight the selected element and draw arrows to related elements
+            function highlightElement(id, type) {
+                clearConnections();  // Clear previous arrows
+
+                // Add arrow connections based on type
+                if (type === "person") {
+                    // Draw arrows from person to related skills
+                    personSkills[id].forEach(skill => {
+                        drawArrows("person-" + id, "skill-" + skill.id);
+                    });
+                } else if (type === "category") {
+                    // Draw arrows from category to related skills
+                    categorySkills[id].forEach(skill => {
+                        drawArrows("category-" + id, "skill-" + skill.id);
+                    });
+                } else if (type === "skill") {
+                    // Draw arrows from skill to related persons
+                    skillPersons[id].forEach(person => {
+                        drawArrows("skill-" + id, "person-" + person.id);
+                    });
+                    // Draw arrows from skill to related categories
+                    skillCategories[id].forEach(category => {
+                        drawArrows("skill-" + id, "category-" + category.id);
+                    });
+                }
+            }
+
+            // Add event listeners to clickable elements
+            document.querySelectorAll(".clickable").forEach(function (element) {
+                element.addEventListener("click", function () {
+                    let id = this.getAttribute("data-id");
+                    let type = this.classList.contains("person") ? "person" :
+                               this.classList.contains("skill") ? "skill" :
+                               this.classList.contains("category") ? "category" : null;
+
+                    if (!type || !id) return;
+
+                    // Highlight the clicked element and draw arrows to related elements
+                    highlightElement(id, type);
+                });
+            });
+
+            // Ensure jsPlumb is ready
+            jsPlumb.ready(function () {
+                instance.setContainer(document.body);
+            });
+        });
+    </script>
+
+</body>
+</html>
